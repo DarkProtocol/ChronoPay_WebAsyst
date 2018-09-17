@@ -13,3 +13,6 @@
 * *SharedSec* — Вам должны выдать.
 * *Payments Url* — (по умолчанию https://payments.chronopay.com) это url, где будет генерироваться оплата (если вы понятия не имеете, что это, то оставьте без изменений).
 * *Callback Url* — cbUrl (на этот url приходят подтверждения оплаты) для Вашего магазина будет http://yourdomain.com/payments.php/chronopay/. Этот праметр нельзя изменить.
+* *Callback URL*, *Callback type*, *Success URL*, *Decline URL*, *Payment types* - устанавливаются вручную, либо в системе ChronoPay.
+* *Time limit for payment page in minutes* - максимальное время нахождения пользователя на странице оплаты (в минутах).
+* *Expire time for order in minutes* - время истечения резерва заказа (в минутах).

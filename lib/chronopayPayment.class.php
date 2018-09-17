@@ -6,7 +6,7 @@
  * @description Chronopay Payment plugin.
  */
 class chronopayPayment extends waPayment implements waIPayment
-{    
+{   
 
     /**
      * Order number separator
@@ -67,6 +67,95 @@ class chronopayPayment extends waPayment implements waIPayment
 
 
     /**
+     * Get param cbUrl
+     *
+     * @return string | null 
+     */
+    public function getCbUrl()
+    {
+        return $this->cbUrl;
+    }
+
+
+    /**
+     * Get param cbType
+     *
+     * @return string | null 
+     */
+    public function getCbType()
+    {
+        return $this->cbType;
+    }
+
+
+    /**
+     * Get param successUrl
+     *
+     * @return string | null 
+     */
+    public function getSuccessUrl()
+    {
+        return $this->successUrl;
+    }
+
+
+    /**
+     * Get param declineUrl
+     *
+     * @return string | null 
+     */
+    public function getDeclineUrl()
+    {
+        return $this->declineUrl;
+    }
+
+
+    /**
+     * Get param paymentTypeGroupId
+     *
+     * @return string | null 
+     */
+    public function getPaymentTypeGroupId()
+    {
+        return $this->paymentTypeGroupId;
+    }
+
+
+    /**
+     * Get param language
+     *
+     * @return string | null 
+     */
+    public function getLanguage()
+    {
+        return $this->language;
+    }
+
+
+    /**
+     * Get param orderTimelimit
+     *
+     * @return int | null 
+     */
+    public function getOrderTimelimit()
+    {
+        return $this->orderTimelimit === null ? $this->orderTimelimit : (int) $this->orderTimelimit;
+    }
+
+
+    /**
+     * Get param orderExpiretime
+     *
+     * @return int | null 
+     */
+    public function getOrderExpiretime()
+    {
+        return $this->orderExpiretime === null ? $this->orderExpiretime : (int) $this->orderExpiretime;
+    }
+
+
+
+    /**
      * Returns array of ISO3 codes of enabled currencies (from settings)
      *
      * @return array
@@ -91,13 +180,12 @@ class chronopayPayment extends waPayment implements waIPayment
      * @throws waException
     */
     public function payment($paymentFormData, $orderData, $autoSubmit = false)
-    {    
-
+    {   
         $this->order = waOrder::factory($orderData);
 
         //decline url
         $transaction_data = array(
-            'order_id' => $this->order->id
+          'order_id' => $this->order->id
         );
 
         $declineUrl = $this->getAdapter()->getBackUrl(waAppPayment::URL_FAIL, $transaction_data);
@@ -114,23 +202,31 @@ class chronopayPayment extends waPayment implements waIPayment
         ));
 
         return $view->fetch($this->path.'/templates/payment.html');
+
+
     }
 
 
     /**
      * Generate payment url
      *
-     * @param string $declineUrl
+     * @param string | null $declineUrl
      *
      * @return sting
-    */
-    private function generatePaymentUrl($declineUrl)
-    {    
+     */
+    private function generatePaymentUrl($declineUrl = null)
+    {   
+
+        // get decline url
+        if (strlen($this->getDeclineUrl()) > 0) {
+            $declineUrl = $this->getDeclineUrl();
+        }
+
 
         // generate order_id
         $orderId = $this->app_id . self::SEPARATOR . 
-        $this->merchant_id . self::SEPARATOR .
-        $this->order->id;
+                   $this->merchant_id . self::SEPARATOR .
+                   $this->order->id;
 
         // calculate product_price
         $price = 0;
@@ -143,8 +239,118 @@ class chronopayPayment extends waPayment implements waIPayment
         $url .= '?product_id=' . urlencode($this->getProductId());
         $url .= '&product_price=' . urlencode($price);
         $url .= '&order_id=' . urlencode($orderId);
-        $url .= '&sign=' . urlencode($this->generatePaymentSign($price, $orderId));
-        $url .= '&decline_url=' . urlencode($declineUrl);
+        $url .= $declineUrl ? '&decline_url=' . urlencode($declineUrl) : '';
+
+        // add success_url
+        if (strlen($this->getSuccessUrl()) > 0) {
+            $url .= '&success_url=' . $this->getSuccessUrl();
+        }
+
+        // add cb_url
+        if (strlen($this->getCbUrl()) > 0) {
+            $url .= '&cb_url=' . $this->getCbUrl();
+        } 
+
+        // add cb_type
+        if (strlen($this->getCbType()) > 0) {
+            $url .= '&cb_type=' . $this->getCbType();
+        } 
+
+        // add payment_type_group_id
+        if (strlen($this->getPaymentTypeGroupId()) > 0) {
+            $url .= '&payment_type_group_id=' . $this->getPaymentTypeGroupId();
+        } 
+
+        // add language
+        if (strlen($this->getLanguage()) > 0) {
+            $url .= '&language=' . $this->getLanguage();
+        } 
+
+        // add orderTimelimit
+        if ($this->getOrderTimelimit() != null) {
+
+            $url .= '&orderTimelimit=' . $this->getOrderTimelimit();
+            $url .= '&sign=' . $this->generatePaymentSign($price, $orderId, $this->getOrderTimelimit());
+
+        } elseif ($this->getOrderExpiretime() != null) {
+
+            $orderExpiretime = date('Y-m-d\TH:i:sO', time() + $this->getOrderExpiretime() * 60);
+            $url .= '&orderExpiretime=' . urlencode($orderExpiretime);
+            $url .= '&sign=' . $this->generatePaymentSign($price, $orderId, $orderExpiretime);
+
+        } else {
+            $url .= '&sign=' . $this->generatePaymentSign($price, $orderId);
+        }
+
+
+        /* CLIENT ADDRESS DATA */
+        // add country
+        if ($this->order->billing_address['country'] != null) {
+            $url .= '&country=' . strtoupper($this->order->billing_address['country']);
+        } 
+
+
+        // add city
+        if ($this->order->billing_address['city'] != null) {
+            $url .= '&city=' . urlencode($this->order->billing_address['city']);
+        } 
+
+        // add state
+        if ($this->order->billing_address['region'] != null) {
+            $url .= '&state=' . urlencode($this->order->billing_address['region']);
+        } 
+
+        // add street
+        if ($this->order->billing_address['street'] != null) {
+            $url .= '&street=' . urlencode($this->order->billing_address['street']);
+        } 
+
+        // add zip
+        if ($this->order->billing_address['zip'] != null) {
+            $url .= '&zip=' . urlencode($this->order->billing_address['zip']);
+        } 
+
+
+        /* CLIENT NAME DATA */
+
+        if (
+            $this->order->billing_address['firstname'] != null 
+            || $this->order->billing_address['lastname'] != null
+        ) {
+
+            // add f_name
+            if ($this->order->billing_address['firstname'] != null) {
+                $url .= '&f_name=' . urlencode($this->order->billing_address['firstname']);
+            } 
+
+            // add s_name
+            if ($this->order->billing_address['lastname'] != null) {
+                $url .= '&s_name=' . urlencode($this->order->billing_address['lastname']);
+            } 
+
+        } elseif ($this->order->contact_name != null) {
+
+            $name = explode(' ', $this->order->contact_name);
+
+            // add f_name
+            $url .= '&f_name=' . urlencode($name[0]);
+
+            // add s_name
+            if (count($name) > 1) {
+                $url .= '&s_name=' . urlencode($name[1]);
+            }
+
+        }
+
+        // add phone
+        if ($this->order->contact_phone != null) {
+            $url .= '&phone=' . urlencode($this->order->contact_phone);
+        }
+
+        // add email
+        if ($this->order->contact_email != null) {
+            $url .= '&email=' . urlencode($this->order->contact_email);
+        }
 
         return $url;
 
@@ -156,15 +362,23 @@ class chronopayPayment extends waPayment implements waIPayment
      *
      * @param float $orderPrice
      * @param string $orderId
+     * @param string | null $additionalParam
      *
      * @return string
      */
-    private function generatePaymentSign($orderPrice, $orderId)
-    {    
+    private function generatePaymentSign($orderPrice, $orderId, $additionalParam = null)
+    {   
+
+        $additionalParamString = '';
+
+        if ($additionalParam != null) {
+            $additionalParamString = $additionalParam . '-' ;
+        }
+
         return md5(
             $this->getProductId() . '-' . 
             $orderPrice . '-' . 
-            $orderId . '-' . $this->getSharedSec()
+            $orderId . '-' . $additionalParamString . $this->getSharedSec()
         );
     }
 
@@ -191,7 +405,7 @@ class chronopayPayment extends waPayment implements waIPayment
      * @inheritdoc
      */
     protected function callbackInit($request)
-    {    
+    {   
 
         if (!empty($request['order_id'])) {
 
@@ -217,7 +431,7 @@ class chronopayPayment extends waPayment implements waIPayment
      * @inheritdoc
      */
     public function callbackHandler($request)
-    {    
+    {   
 
         // check all params
         $customerId = wa()->getRequest()->request('customer_id'); 
@@ -242,7 +456,7 @@ class chronopayPayment extends waPayment implements waIPayment
         }
 
         // Convert request data into acceptable format and save transaction
-    
+        
         if ($transactionType == self::PURCHASE_TRANSACTION_TYPE) {
             // if purchase
             $transactionData = $this->formalizePurchaseData($request);
@@ -250,7 +464,7 @@ class chronopayPayment extends waPayment implements waIPayment
             $result = $this->execAppCallback(self::CALLBACK_PAYMENT, $transactionData);
         }
 
-    
+        
         if ($transactionType == self::REFUND_TRANSACTION_TYPE) { 
             // if refund
             $transactionData = $this->formalizeRefundData($request);
@@ -277,20 +491,20 @@ class chronopayPayment extends waPayment implements waIPayment
      * @return array | null
      */
     private function getLastTransactionForOrder($orderId)
-    {    
+    {   
         $transactions = $this->getTransactionsByFields(array(
             'plugin'      => $this->id,
             'order_id'    => $orderId,
             'app_id'      => $this->app_id,
             'merchant_id' => $this->key,
-        ));    
+        )); 
 
         if (!$transactions) {
             return null;
         }
 
         return end($transactions);
-    }    
+    }   
 
 
     /**
@@ -316,7 +530,7 @@ class chronopayPayment extends waPayment implements waIPayment
      * @return array
      */
     private function formalizeRefundData($request)
-    {    
+    {   
         $transactionData = $this->formalizeData($request);
         $transactionData['type'] = self::OPERATION_REFUND;
         $transactionData['state'] = self::STATE_REFUNDED;
