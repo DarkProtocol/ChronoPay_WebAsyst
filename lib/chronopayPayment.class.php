@@ -243,12 +243,12 @@ class chronopayPayment extends waPayment implements waIPayment
 
         // add success_url
         if (strlen($this->getSuccessUrl()) > 0) {
-            $url .= '&success_url=' . $this->getSuccessUrl();
+            $url .= '&success_url=' . urlencode($this->getSuccessUrl());
         }
 
         // add cb_url
         if (strlen($this->getCbUrl()) > 0) {
-            $url .= '&cb_url=' . $this->getCbUrl();
+            $url .= '&cb_url=' . urlencode($this->getCbUrl());
         } 
 
         // add cb_type
